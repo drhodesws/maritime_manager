@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maritime Records Manager</title>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; background: #f8f9fa; display: flex; height: 100vh; overflow: hidden; }
+        .sidebar { width: 200px; background: #001f3f; color: white; padding: 20px; box-sizing: border-box; height: 100%; position: fixed; overflow-y: auto; }
+        .sidebar a { display: flex; align-items: center; color: white; text-decoration: none; padding: 10px; margin-bottom: 10px; border-radius: 5px; transition: background 0.3s; }
+        .sidebar a:hover { background: #004080; }
+        .sidebar a.active { background: #003366; }
+        .sidebar-icon { margin-right: 10px; font-size: 18px; }
+        .main { margin-left: 200px; flex: 1; padding: 20px; overflow-y: auto; }
+        .header { background: white; padding: 20px; border-bottom: 1px solid #ddd; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .header p { margin: 5px 0 0; color: #666; font-size: 14px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #001f3f; color: white; }
+        .total { font-weight: bold; background: #e0e0e0; }
+        .action-btn { background: #003366; color: white; border: none; padding: 5px 10px; cursor: pointer; }
+        .week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
+        .day-card { background: #fff; border: 1px solid #ddd; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .day-card h3 { margin: 0; color: #001f3f; }
+        .entry { margin-top: 10px; display: none; }
+        .show { display: block; }
+        .summary { background: #001f3f; color: white; padding: 10px; text-align: center; }
+        .day-section { border-bottom: 1px solid #ddd; padding: 10px; }
+        .day-header { cursor: pointer; font-weight: bold; }
+        .entries { display: none; }
+        #fab { position: fixed; bottom: 20px; right: 20px; background: #003366; color: white; border-radius: 50%; width: 50px; height: 50px; text-align: center; line-height: 50px; cursor: pointer; }
+        #entryModal, #entryForm, .side-panel { display: none; position: fixed; top: 20%; left: 30%; width: 40%; background: white; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        #entryForm, .side-panel { top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); }
+        #entryForm form, .side-panel form { background: white; padding: 20px; margin: 20% auto; width: 80%; display: grid; gap: 10px; }
+        .chart { height: 200px; background: #e0e0e0; margin-bottom: 20px; }
+        .entries-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+        .entry-card { background: white; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
+        .side-panel { right: -300px; width: 300px; height: 100%; transition: right 0.3s; padding: 20px; box-shadow: -2px 0 5px rgba(0,0,0,0.2); }
+        .open { right: 0; }
+        .toggle-btn { background: #17a2b8; color: white; border: none; padding: 10px; cursor: pointer; }
+        input, select { padding: 5px; width: 100%; }
+        @media (max-width: 768px) {
+            .sidebar { width: 100px; }
+            .main { margin-left: 100px; }
+            table, .week-grid, .entries-grid { font-size: 14px; }
+            th, td { padding: 5px; }
+            #entryModal, #entryForm, .side-panel { left: 10%; width: 80%; }
+            #fab { bottom: 10px; right: 10px; width: 40px; height: 40px; line-height: 40px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>Maritime Records</h2>
+        {% if 'username' not in session %}
+            <a href="{{ url_for('auth.login') }}" class="active"><span class="sidebar-icon">🔑</span>Login</a>
+            <a href="{{ url_for('index') }}"><span class="sidebar-icon">🏠</span>Home</a>
+        {% else %}
+            <a href="{{ url_for('index') }}"><span class="sidebar-icon">🏠</span>Home</a>
+            {% set permissions = session.get('permissions', {}) %}
+            {% if permissions.get('employees', False) and session['role'] == 'admin' %}
+                <a href="{{ url_for('employees.list_employees') }}"><span class="sidebar-icon">🧑‍💼</span>Employees</a>
+            {% endif %}
+            {% if permissions.get('timebooks', False) %}
+                <a href="{{ url_for('timebooks.list_timebooks') }}"><span class="sidebar-icon">⏰</span>Timebooks</a>
+            {% endif %}
+            {% if permissions.get('contacts', False) and session['role'] == 'admin' %}
+                <a href="#"><span class="sidebar-icon">👤</span>Contacts</a>
+            {% endif %}
+            {% if permissions.get('customers', False) and session['role'] == 'admin' %}
+                <a href="#"><span class="sidebar-icon">🏢</span>Customers</a>
+            {% endif %}
+            {% if permissions.get('items', False) and session['role'] == 'admin' %}
+                <a href="#"><span class="sidebar-icon">📦</span>Items</a>
+            {% endif %}
+            {% if permissions.get('jobs', False) and session['role'] == 'admin' %}
+                <a href="#"><span class="sidebar-icon">🛠️</span>Jobs</a>
+            {% endif %}
+            {% if permissions.get('purchase_orders', False) and session['role'] == 'admin' %}
+                <a href="#"><span class="sidebar-icon">🛒</span>Purchase Orders</a>
+            {% endif %}
+            {% if permissions.get('vendors', False) and session['role'] == 'admin' %}
+                <a href="#"><span class="sidebar-icon">🏭</span>Vendors</a>
+            {% endif %}
+            {% if permissions.get('vessels', False) and session['role'] == 'admin' %}
+                <a href="#"><span class="sidebar-icon">🚢</span>Vessels</a>
+            {% endif %}
+            {% if session['role'] == 'admin' %}
+                <a href="{{ url_for('auth.create_user') }}"><span class="sidebar-icon">➕</span>Users</a> <!-- Confirmed change from "Create User" to "Users" -->
+                <a href="{{ url_for('control_panel.control_panel') }}"><span class="sidebar-icon">⚙️</span>Control Panel</a>
+            {% endif %}
+            <a href="{{ url_for('auth.logout') }}"><span class="sidebar-icon">🚪</span>Logout</a>
+        {% endif %}
+    </div>
+
+    <div class="main">
+        {% block content %}{% endblock %}
+    </div>
+</body>
+{% block scripts %}{% endblock %}
+</html>

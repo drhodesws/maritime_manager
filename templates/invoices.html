@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid py-4">
+  <h2>Invoices</h2>
+  <a href="{{ url_for('invoices.create_invoice') }}" class="btn btn-success btn-lg mb-4">
+    Create New Invoice
+  </a>
+  <p>Click above to generate an invoice from completed jobs.</p>
+</div>
+{% endblock %}

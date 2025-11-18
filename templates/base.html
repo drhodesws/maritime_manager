@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maritime Records Manager</title>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; background: #f8f9fa; display: flex; height: 100vh; overflow: hidden; }
+        .sidebar { width: 200px; background: #001f3f; color: white; padding: 20px; box-sizing: border-box; height: 100%; position: fixed; overflow-y: auto; }
+        .sidebar a { display: flex; align-items: center; color: white; text-decoration: none; padding: 10px; margin-bottom: 10px; border-radius: 5px; transition: background 0.3s; }
+        .sidebar a:hover { background: #004080; }
+        .sidebar a.active { background: #003366; }
+        .sidebar-icon { margin-right: 10px; font-size: 18px; }
+        .main { padding: 20px; overflow-y: auto; margin-left: 200px; }
+        .header { background: white; padding: 20px; border-bottom: 1px solid #ddd; }
+        .header h1 { margin: 0; font-size: 24px; }
+        .header p { margin: 5px 0 0; color: #666; font-size: 14px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #001f3f; color: white; }
+        .total { font-weight: bold; background: #e0e0e0; }
+        .action-btn { background: #003366; color: white; border: none; padding: 5px 10px; cursor: pointer; font-size: 12px; }
+        .edit-btn { background: #003366; color: white; border: none; padding: 5px 10px; cursor: pointer; font-size: 12px; width: 40px; height: 30px; line-height: 20px; text-align: center; } /* Taller button, themed */
+        .week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
+        .day-card { background: #fff; border: 1px solid #ddd; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .day-card h3 { margin: 0; color: #001f3f; }
+        .entry { margin-top: 10px; display: none; }
+        .show { display: block; }
+        .summary { background: #001f3f; color: white; padding: 10px; text-align: center; }
+        .day-section { border-bottom: 1px solid #ddd; padding: 10px; }
+        .day-header { cursor: pointer; font-weight: bold; }
+        .entries { display: none; }
+        #fab { position: fixed; bottom: 20px; right: 20px; background: #003366; color: white; border-radius: 50%; width: 50px; height: 50px; text-align: center; line-height: 50px; cursor: pointer; }
+        #entryModal, #entryForm, .side-panel { display: none; position: fixed; top: 20%; left: 30%; width: 40%; background: white; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        #entryForm, .side-panel { top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); }
+        #entryForm form, .side-panel form { background: white; padding: 20px; margin: 20% auto; width: 80%; display: grid; gap: 10px; }
+        .chart { height: 200px; background: #e0e0e0; margin-bottom: 20px; }
+        .entries-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+        .entry-card { background: white; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
+        .side-panel { right: -300px; width: 300px; height: 100%; transition: right 0.3s; padding: 20px; box-shadow: -2px 0 5px rgba(0,0,0,0.2); }
+        .open { right: 0; }
+        .toggle-btn { background: #17a2b8; color: white; border: none; padding: 10px; cursor: pointer; }
+        input, select, textarea { padding: 5px; width: 100%; }
+        /* Timebook-specific styles */
+        .timebook-table,
+        .timebook-form-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            margin-top: 5px;
+        }
+        .timebook-table th,
+        .timebook-table td,
+        .timebook-form-table td {
+            border: 1px solid #ddd;
+            padding: 5px;
+            text-align: left;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            vertical-align: top; /* Align content to the top */
+        }
+        .timebook-table th {
+            background: #001f3f;
+            color: white;
+        }
+        .timebook-table th:nth-child(1),
+        .timebook-table td:nth-child(1),
+        .timebook-form-table td:nth-child(1) { width: 40px; } /* Edit column (narrowed to button width) */
+        .timebook-table th:nth-child(2),
+        .timebook-table td:nth-child(2),
+        .timebook-form-table td:nth-child(2) { width: 40px; } /* Start Time (reduced from 60px) */
+        .timebook-table th:nth-child(3),
+        .timebook-table td:nth-child(3),
+        .timebook-form-table td:nth-child(3) { width: 40px; } /* Stop Time (reduced from 60px) */
+        .timebook-table th:nth-child(4),
+        .timebook-table td:nth-child(4),
+        .timebook-form-table td:nth-child(4) { width: 200px; } /* Description */
+        .timebook-table th:nth-child(5),
+        .timebook-table td:nth-child(5),
+        .timebook-form-table td:nth-child(5) { width: 70px; } /* Job # */
+        .timebook-table th:nth-child(6),
+        .timebook-table td:nth-child(6),
+        .timebook-form-table td:nth-child(6) { width: 60px; } /* Mileage */
+        .timebook-table th:nth-child(7),
+        .timebook-table td:nth-child(7),
+        .timebook-form-table td:nth-child(7) { width: 150px; } /* Location */
+        .timebook-table th:nth-child(8),
+        .timebook-table td:nth-child(8),
+        .timebook-form-table td:nth-child(8) { width: 20px; } /* Billable (reduced from 60px) */
+        .timebook-table td:nth-child(4),
+        .timebook-form-table td:nth-child(4) {
+            white-space: normal;
+            word-wrap: break-word;
+        }
+        .timebook-form-table input,
+        .timebook-form-table textarea,
+        .timebook-form-table select {
+            width: 100%;
+            padding: 5px;
+            box-sizing: border-box;
+            min-width: 0; /* Prevent inputs from expanding beyond parent */
+            vertical-align: top; /* Align inputs to the top within their cells */
+        }
+        .timebook-table-container {
+            width: 100%;
+            overflow-x: auto;
+        }
+        @media (max-width: 768px) {
+            .sidebar { width: 100px; }
+            .main { margin-left: 120px; }
+            table, .week-grid, .entries-grid { font-size: 14px; }
+            th, td { padding: 5px; }
+            .timebook-table th,
+            .timebook-table td,
+            .timebook-form-table td { padding: 3px; font-size: 12px; }
+            .timebook-form-table input,
+            .timebook-form-table textarea,
+            .timebook-form-table select { padding: 3px; font-size: 12px; }
+            #entryModal, #entryForm, .side-panel { left: 10%; width: 80%; }
+            #fab { bottom: 10px; right: 10px; width: 40px; height: 40px; line-height: 40px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>DC Solutions</h2>
+        {% if 'username' not in session %}
+            <a href="{{ url_for('auth.login') }}" class="active"><span class="sidebar-icon">🔑</span>Login</a>
+            <a href="{{ url_for('index') }}"><span class="sidebar-icon">🏠</span>Home</a>
+        {% else %}
+            <a href="{{ url_for('index') }}"><span class="sidebar-icon">🏠</span>Home</a>
+            {% set permissions = session.get('permissions', {}) %}
+            {% if session['role'] == 'admin' or permissions.get('employees', 'false') == 'true' %}
+                <a href="{{ url_for('employees.employees_page') }}"><span class="sidebar-icon">🧑‍💼</span>Employees</a>
+            {% endif %}
+            {% if permissions.get('timebooks', 'false') == 'true' %}
+                <a href="{{ url_for('timebooks.timebooks_page') }}"><span class="sidebar-icon">⏰</span>Timebook</a>
+            {% endif %}
+            {% if session['role'] == 'admin' or permissions.get('contacts', 'false') == 'true' %}
+                <a href="{{ url_for('contacts.contacts_page') }}"><span class="sidebar-icon">👤</span>Contacts</a>
+            {% endif %}
+            {% if session['role'] == 'admin' or permissions.get('customers', 'false') == 'true' %}
+                <a href="{{ url_for('customers.customers_page') }}"><span class="sidebar-icon">🏢</span>Customers</a>
+            {% endif %}
+            {% if session['role'] == 'admin' or permissions.get('items', 'false') == 'true' %}
+                <a href="{{ url_for('items.items_page') }}"><span class="sidebar-icon">📦</span>Items</a>
+            {% endif %}
+            {% if session['role'] == 'admin' or permissions.get('jobs', 'false') == 'true' %}
+                <a href="{{ url_for('jobs.jobs_page') }}"><span class="sidebar-icon">🛠️</span>Jobs</a>
+            {% endif %}
+            {% if session['role'] == 'admin' or permissions.get('purchase_orders', 'false') == 'true' %}
+                <a href="{{ url_for('purchase_orders.purchase_orders_page') }}"><span class="sidebar-icon">🛒</span>Purchase Orders</a>
+            {% endif %}
+            {% if session['role'] == 'admin' or (permissions.get('vendors')|default('false')|string).strip() == 'true' %}
+                <a href="{{ url_for('vendors.vendors_page') }}"><span class="sidebar-icon">🏭</span>Vendors</a>
+            {% endif %}
+            {% if session['role'] == 'admin' or permissions.get('vessels', 'false') == 'true' %}
+                <a href="{{ url_for('vessels.vessels_page') }}"><span class="sidebar-icon">🚢</span>Vessels</a>
+            {% endif %}
+            {% if session['role'] == 'admin' or permissions.get('invoices', 'false') == 'true' %}
+                <a href="{{ url_for('invoices.invoices_page') }}"><span class="sidebar-icon">💰</span>Invoices</a>
+            {% endif %}
+            {% if session['role'] == 'admin' %}
+                <a href="{{ url_for('control_panel.control_panel') }}"><span class="sidebar-icon">⚙️</span>Control Panel</a>
+            {% endif %}
+            <a href="{{ url_for('auth.logout') }}"><span class="sidebar-icon">🚪</span>Logout</a>
+            
+        {% endif %}
+    </div>
+
+    <div class="main">
+        {% block content %}{% endblock %}
+    </div>
+</body>
+{% block scripts %}{% endblock %}
+</html>

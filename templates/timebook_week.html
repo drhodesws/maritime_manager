@@ -1,0 +1,449 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <div class="header" style="background-color: {{ header_color|default('#1da1f2') }}; color: white; padding: 15px; border-radius: 8px 8px 0 0; margin-bottom: 10px; font-size: 24px; font-weight: bold;">
+        <h1>Timebook Week View</h1>
+        <p style="font-size: 14px; font-weight: normal;">Log your time entries for the current week.</p>
+    </div>
+    <!-- Week Selector and Navigation Options -->
+    <div style="margin: 10px 0; padding: 15px; background: linear-gradient(to right, {{ background_color|default('#f0f0f0') }}, #ffffff); border-radius: 8px; display: flex; justify-content: space-between; align-items: center; gap: 15px; width: 100%; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+        <div style="display: flex; align-items: center; gap: 15px;">
+            {% if session['role'] == 'admin' %}
+                <select name="employee" id="employee-select" onchange="updateEmployee(this.value)" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; background-color: white; transition: border-color 0.3s;">
+                    {% for emp in employees %}
+                        <option value="{{ emp.full_name }}" {% if emp.full_name == selected_employee %}selected{% endif %}>{{ emp.full_name }}</option>
+                    {% endfor %}
+                </select>
+            {% endif %}
+            <!-- Navigation Buttons -->
+            <button class="action-btn" style="padding: 8px 15px; margin-right: 10px; background-color: {{ button_color|default('#1da1f2') }}; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.3s;" onmouseover="this.style.backgroundColor='#1991e2'" onmouseout="this.style.backgroundColor='{{ button_color|default('#1da1f2') }}'" onclick="jumpToCurrentWeek()">Current Week</button>
+            <button class="action-btn" style="padding: 8px 15px; margin-right: 10px; background-color: {{ button_color|default('#1da1f2') }}; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.3s;" onmouseover="this.style.backgroundColor='#1991e2'" onmouseout="this.style.backgroundColor='{{ button_color|default('#1da1f2') }}'" onclick="previousWeek()">Previous Week</button>
+            <button class="action-btn" style="padding: 8px 15px; background-color: {{ button_color|default('#1da1f2') }}; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.3s;" onmouseover="this.style.backgroundColor='#1991e2'" onmouseout="this.style.backgroundColor='{{ button_color|default('#1da1f2') }}'" onclick="nextWeek()">Next Week</button>
+            <button id="calendar-btn" class="action-btn" style="padding: 8px 15px; background-color: {{ button_color|default('#1da1f2') }}; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.3s;" onmouseover="this.style.backgroundColor='#1991e2'" onmouseout="this.style.backgroundColor='{{ button_color|default('#1da1f2') }}'" onclick="toggleCalendar()">Calendar</button>
+        </div>
+        <!-- Dropdown for recent weeks -->
+        <select id="week-select" onchange="selectWeek(this.value)" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; background-color: white; transition: border-color 0.3s;">
+            {% if week_options is defined %}
+                {% for week in week_options %}
+                    {% if week.start_date is defined and week.label is defined %}
+                        <option value="{{ week.start_date }}" {% if week.start_date == start_date.strftime('%Y-%m-%d') %}selected{% endif %}>
+                            {{ week.label }}
+                        </option>
+                    {% else %}
+                        <option disabled>Invalid week data: {{ week }}</option>
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                <option disabled>No week options available</option>
+            {% endif %}
+        </select>
+    </div>
+    <div style="margin: 0; padding: 0; width: 100%;">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <p style="color: {{ 'green' if category == 'success' else 'red' }}; padding: 10px; margin-bottom: 10px; border-radius: 4px; background-color: #f9f9f9;">{{ message }}</p>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        <div style="display: flex; flex-direction: column; gap: 15px; width: 100%;">
+            {% for date in week_dates %} <!-- Starts with Monday, ends with Sunday -->
+                <div style="border: 1px solid #ddd; padding: 15px; border-radius: 8px; background-color: white; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);">
+                    <div style="display: flex; align-items: center; width: 100%; margin-bottom: 10px;">
+                        <button class="action-btn" id="add-btn-{{ date.strftime('%Y-%m-%d') }}" style="padding: 8px 12px; margin-right: 10px; background-color: {{ button_color|default('#1da1f2') }}; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.3s;" onmouseover="this.style.backgroundColor='#1991e2'" onmouseout="this.style.backgroundColor='{{ button_color|default('#1da1f2') }}'" onclick="showAddForm('{{ date.strftime('%Y-%m-%d') }}', this)">+</button>
+                        <h3 style="margin: 0; font-size: 18px; flex-grow: 1; color: #333;">{{ date.strftime('%A, %B %d, %Y') }}</h3>
+                    </div>
+                    {% if entries_by_date.get(date, []) %} <!-- Check if entries exist -->
+                        <div class="timebook-table-container">
+                            <table class="timebook-table" style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                                <thead>
+                                    <tr style="background-color: {{ header_color|default('#f0f0f0') }}; color: #333;">
+                                        <th style="padding: 10px; border: 1px solid #ddd;">Edit</th>
+                                        <th style="padding: 10px; border: 1px solid #ddd;">Start Time</th>
+                                        <th style="padding: 10px; border: 1px solid #ddd;">Stop Time</th>
+                                        <th style="padding: 10px; border: 1px solid #ddd;">Description</th>
+                                        <th style="padding: 10px; border: 1px solid #ddd;">Job #</th>
+                                        <th style="padding: 10px; border: 1px solid #ddd;">Mileage</th>
+                                        <th style="padding: 10px; border: 1px solid #ddd;">Location</th>
+                                        <th style="padding: 10px; border: 1px solid #ddd;">Billable</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for entry in entries_by_date.get(date, []) %}
+                                        <tr id="row_{{ entry.id }}" class="entry-row" style="background-color: {{ loop.cycle('#ffffff', '#f9f9f9') }};">
+                                            <td style="padding: 8px; border: 1px solid #ddd;">
+                                                <button class="edit-btn" style="padding: 6px 10px; background-color: {{ button_color|default('#1da1f2') }}; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.3s;" onmouseover="this.style.backgroundColor='#1991e2'" onmouseout="this.style.backgroundColor='{{ button_color|default('#1da1f2') }}'" onclick="showEditForm('{{ entry.id }}', this)">Edit</button>
+                                            </td>
+                                            <td style="padding: 8px; border: 1px solid #ddd;">{{ entry.start_time if entry.start_time is string else (entry.start_time.strftime('%H:%M') if entry.start_time else '-') }}</td>
+                                            <td style="padding: 8px; border: 1px solid #ddd;">{{ entry.stop_time if entry.stop_time is string else (entry.stop_time.strftime('%H:%M') if entry.stop_time else '-') }}</td>
+                                            <td style="padding: 8px; border: 1px solid #ddd;">{{ entry.description or '-' }}</td>
+                                            <td style="padding: 8px; border: 1px solid #ddd;">{{ entry.job_number or '-' }}</td>
+                                            <td style="padding: 8px; border: 1px solid #ddd;">{{ entry.mileage or '0' }}</td>
+                                            <td style="padding: 8px; border: 1px solid #ddd;">{{ entry.location or '-' }}</td>
+                                            <td style="padding: 8px; border: 1px solid #ddd;">{{ entry.billable|default('No') }}</td>
+                                            <tr id="edit_form_{{ entry.id }}" style="display: none;" class="edit-row">
+                                                <td colspan="8" style="padding: 10px; border: 1px solid #ddd;">
+                                                    <form method="post" action="" onsubmit="submitEditForm(event, '{{ entry.id }}')" style="display: flex; flex-direction: column; gap: 10px;">
+                                                        {{ form.hidden_tag() }}
+                                                        <input type="hidden" name="entry_id" value="{{ entry.id }}">
+                                                        <input type="hidden" name="action" value="edit">
+                                                        <table class="timebook-form-table" style="width: 100%; border-collapse: collapse;">
+                                                            <tbody>
+                                                                <tr>
+                                                                    <td style="padding: 8px; border: 1px solid #ddd;">
+                                                                        <div style="display: flex; flex-direction: column;">
+                                                                            <label for="employee_{{ entry.id }}" style="font-weight: bold; margin-bottom: 5px;">Employee:</label>
+                                                                            <input type="text" name="employee" id="employee_{{ entry.id }}" value="{{ entry.employee }}" {% if session['role'] != 'admin' %}disabled{% endif %} style="padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
+                                                                        </div>
+                                                                    </td>
+                                                                    <td style="padding: 8px; border: 1px solid #ddd;">
+                                                                        <div style="display: flex; flex-direction: column;">
+                                                                            <label for="start_time_{{ entry.id }}" style="font-weight: bold; margin-bottom: 5px;">Start Time:</label>
+                                                                            <input type="text" name="start_time" id="start_time_{{ entry.id }}" value="{{ entry.start_time if entry.start_time is string else (entry.start_time.strftime('%H:%M') if entry.start_time else '') }}" required oninput="formatTimeInput(this)" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
+                                                                        </div>
+                                                                    </td>
+                                                                    <td style="padding: 8px; border: 1px solid #ddd;">
+                                                                        <div style="display: flex; flex-direction: column;">
+                                                                            <label for="stop_time_{{ entry.id }}" style="font-weight: bold; margin-bottom: 5px;">Stop Time:</label>
+                                                                            <input type="text" name="stop_time" id="stop_time_{{ entry.id }}" value="{{ entry.stop_time if entry.stop_time is string else (entry.stop_time.strftime('%H:%M') if entry.stop_time else '') }}" required oninput="formatTimeInput(this)" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
+                                                                        </div>
+                                                                    </td>
+                                                                    <td style="padding: 8px; border: 1px solid #ddd;">
+                                                                        <div style="display: flex; flex-direction: column;">
+                                                                            <label for="description_{{ entry.id }}" style="font-weight: bold; margin-bottom: 5px;">Description:</label>
+                                                                            <textarea name="description" id="description_{{ entry.id }}" style="min-height: 60px; resize: vertical; padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">{{ entry.description or '' }}</textarea>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td style="padding: 8px; border: 1px solid #ddd;">
+                                                                        <div style="display: flex; flex-direction: column;">
+                                                                            <label for="job_number_{{ entry.id }}" style="font-weight: bold; margin-bottom: 5px;">Job #:</label>
+                                                                            <input type="text" name="job_number" id="job_number_{{ entry.id }}" value="{{ entry.job_number or '' }}" maxlength="7" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
+                                                                        </div>
+                                                                    </td>
+                                                                    <td style="padding: 8px; border: 1px solid #ddd;">
+                                                                        <div style="display: flex; flex-direction: column;">
+                                                                            <label for="mileage_{{ entry.id }}" style="font-weight: bold; margin-bottom: 5px;">Mileage:</label>
+                                                                            <input type="number" name="mileage" id="mileage_{{ entry.id }}" value="{{ entry.mileage or 0 }}" step="1" max="9999" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
+                                                                        </div>
+                                                                    </td>
+                                                                    <td style="padding: 8px; border: 1px solid #ddd;">
+                                                                        <div style="display: flex; flex-direction: column;">
+                                                                            <label for="location_{{ entry.id }}" style="font-weight: bold; margin-bottom: 5px;">Location:</label>
+                                                                            <input type="text" name="location" id="location_{{ entry.id }}" value="{{ entry.location or '' }}" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
+                                                                        </div>
+                                                                    </td>
+                                                                    <td style="padding: 8px; border: 1px solid #ddd;">
+                                                                        <div style="display: flex; flex-direction: column;">
+                                                                            <label for="billable_{{ entry.id }}" style="font-weight: bold; margin-bottom: 5px;">Billable:</label>
+                                                                            <select name="billable" id="billable_{{ entry.id }}" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
+                                                                                <option value="Yes" {% if entry.billable == 'Yes' %}selected{% endif %}>Yes</option>
+                                                                                <option value="No" {% if entry.billable == 'No' or not entry.billable %}selected{% endif %}>No</option>
+                                                                            </select>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                        <div style="display: flex; gap: 10px; margin-top: 10px;">
+                                                            <button type="submit" class="action-btn" style="padding: 8px 20px; background-color: {{ button_color|default('#1da1f2') }}; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.3s;" onmouseover="this.style.backgroundColor='#1991e2'" onmouseout="this.style.backgroundColor='{{ button_color|default('#1da1f2') }}'">Save</button>
+                                                            <button type="button" class="action-btn" style="padding: 8px 20px; background-color: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.3s;" onmouseover="this.style.backgroundColor='#c0392b'" onmouseout="this.style.backgroundColor='#e74c3c'" onclick="hideEditForm('{{ entry.id }}')">Cancel</button>
+                                                        </div>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p style="margin: 10px 0; color: #666; font-size: 14px;">No entries for {{ date.strftime('%A, %B %d, %Y') }}.</p>
+                    {% endif %}
+                    <div id="form_{{ date.strftime('%Y-%m-%d') }}" style="display: none; margin-top: 5px; width: 100%;">
+                        <form method="post" action="" onsubmit="submitAddForm(event, '{{ date.strftime('%Y-%m-%d') }}')">
+                            {{ form.hidden_tag() }}
+                            <input type="hidden" name="selected_date" value="{{ date.strftime('%Y-%m-%d') }}">
+                            <input type="hidden" name="action" value="add">
+                            <table class="timebook-form-table">
+                                <tbody>
+                                    <tr>
+                                        <td>
+                                            <div style="display: flex; flex-direction: column;">
+                                                <label for="employee_{{ date.strftime('%Y-%m-%d') }}">Employee:</label>
+                                                <input type="text" name="employee" id="employee_{{ date.strftime('%Y-%m-%d') }}" value="{{ selected_employee or current_employee }}" {% if session['role'] != 'admin' %}disabled{% endif %} style="padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div style="display: flex; flex-direction: column;">
+                                                <label for="start_time_{{ date.strftime('%Y-%m-%d') }}">Start Time:</label>
+                                                <input type="text" name="start_time" id="start_time_{{ date.strftime('%Y-%m-%d') }}" placeholder="10:22" required oninput="formatTimeInput(this)" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div style="display: flex; flex-direction: column;">
+                                                <label for="stop_time_{{ date.strftime('%Y-%m-%d') }}">Stop Time:</label>
+                                                <input type="text" name="stop_time" id="stop_time_{{ date.strftime('%Y-%m-%d') }}" placeholder="17:30" required oninput="formatTimeInput(this)" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div style="display: flex; flex-direction: column;">
+                                                <label for="description_{{ date.strftime('%Y-%m-%d') }}">Description:</label>
+                                                <textarea name="description" id="description_{{ date.strftime('%Y-%m-%d') }}" placeholder="e.g., Maintenance on MV Ocean Star" style="min-height: 60px; resize: vertical; padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 100%;"></textarea>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div style="display: flex; flex-direction: column;">
+                                                <label for="job_number_{{ date.strftime('%Y-%m-%d') }}">Job #:</label>
+                                                <input type="text" name="job_number" id="job_number_{{ date.strftime('%Y-%m-%d') }}" placeholder="e.g., 111425001" maxlength="7" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div style="display: flex; flex-direction: column;">
+                                                <label for="mileage_{{ date.strftime('%Y-%m-%d') }}">Mileage:</label>
+                                                <input type="number" name="mileage" id="mileage_{{ date.strftime('%Y-%m-%d') }}" placeholder="e.g., 100" step="1" max="9999" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div style="display: flex; flex-direction: column;">
+                                                <label for="location_{{ date.strftime('%Y-%m-%d') }}">Location:</label>
+                                                <input type="text" name="location" id="location_{{ date.strftime('%Y-%m-%d') }}" placeholder="e.g., Houston" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div style="display: flex; flex-direction: column;">
+                                                <label for="billable_{{ date.strftime('%Y-%m-%d') }}">Billable:</label>
+                                                <select name="billable" id="billable_{{ date.strftime('%Y-%m-%d') }}" style="padding: 6px; border: 1px solid #ccc; border-radius: 4px; width: 100%;">
+                                                    <option value="Yes">Yes</option>
+                                                    <option value="No" selected>No</option>
+                                                </select>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <button type="submit" class="action-btn" style="padding: 10px 20px; background-color: {{ button_color|default('#1da1f2') }}; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.3s;" onmouseover="this.style.backgroundColor='#1991e2'" onmouseout="this.style.backgroundColor='{{ button_color|default('#1da1f2') }}'">Save</button>
+                            <button type="button" class="action-btn" style="padding: 10px 20px; background-color: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; transition: background-color 0.3s;" onmouseover="this.style.backgroundColor='#c0392b'" onmouseout="this.style.backgroundColor='#e74c3c'" onclick="hideAddForm('{{ date.strftime('%Y-%m-%d') }}')">Cancel</button>
+                        </form>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+    <!-- Control Panel Links -->
+    <div style="margin-top: 20px; text-align: center;">
+        {% if session['role'] == 'admin' %}
+            <a href="{{ url_for('control_panel.control_panel') }}" style="padding: 10px 20px; background-color: {{ button_color|default('#1da1f2') }}; color: white; text-decoration: none; border-radius: 4px; margin-right: 10px; transition: background-color 0.3s;" onmouseover="this.style.backgroundColor='#1991e2'" onmouseout="this.style.backgroundColor='{{ button_color|default('#1da1f2') }}'">Manage Menu Items</a>
+        {% endif %}
+        <a href="{{ url_for('timebooks.color_panel') }}" style="padding: 10px 20px; background-color: {{ button_color|default('#1da1f2') }}; color: white; text-decoration: none; border-radius: 4px; transition: background-color 0.3s;" onmouseover="this.style.backgroundColor='#1991e2'" onmouseout="this.style.backgroundColor='{{ button_color|default('#1da1f2') }}'">Customize Colors</a>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/en.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script>
+        let calendarInstance = null; // Persistent calendar instance
+
+        function formatTimeInput(input) {
+            let value = input.value.replace(/[^0-9:]/g, '');
+            if (value.length > 5) value = value.slice(0, 5);
+            if (value.length >= 2 && value.charAt(2) !== ':') {
+                value = value.slice(0, 2) + ':' + value.slice(2);
+            }
+            if (value.length === 1 && parseInt(value) > 2) value = '0' + value + ':';
+            if (value.length === 2 && parseInt(value) < 24) value += ':';
+            if (value.length > 3 && parseInt(value.slice(3)) > 59) {
+                value = value.slice(0, 3) + '00';
+            }
+            input.value = value;
+        }
+
+        function showAddForm(date, button) {
+            const formDiv = document.getElementById(`form_${date}`);
+            if (formDiv) {
+                formDiv.style.display = 'block';
+                document.getElementById(`start_time_${date}`).focus();
+                document.querySelectorAll('[id^="form_"]').forEach(div => {
+                    if (div.id !== `form_${date}`) div.style.display = 'none';
+                });
+                document.querySelectorAll('.edit-row').forEach(div => div.style.display = 'none');
+                if (calendarInstance) calendarInstance.close(); // Close calendar if open
+            } else {
+                console.error(`Form div not found for date: ${date}`);
+            }
+        }
+
+        function hideAddForm(date) {
+            const formDiv = document.getElementById(`form_${date}`);
+            if (formDiv) {
+                formDiv.style.display = 'none';
+                const inputs = formDiv.querySelectorAll('input[type="text"], input[type="number"], textarea, select');
+                inputs.forEach(input => input.value = '');
+            }
+        }
+
+        function showEditForm(entryId, button) {
+            const row = document.getElementById(`row_${entryId}`);
+            const editRow = document.getElementById(`edit_form_${entryId}`);
+            if (row && editRow) {
+                row.style.display = 'none';
+                editRow.style.display = 'table-row';
+                document.getElementById(`start_time_${entryId}`).focus();
+                document.querySelectorAll('[id^="edit_form_"]').forEach(div => {
+                    if (div.id !== `edit_form_${entryId}`) div.style.display = 'none';
+                });
+                document.querySelectorAll('[id^="form_"]').forEach(div => div.style.display = 'none');
+                if (calendarInstance) calendarInstance.close(); // Close calendar if open
+            } else {
+                console.error(`Edit row or parent row not found for entry: ${entryId}`);
+            }
+        }
+
+        function hideEditForm(entryId) {
+            const row = document.getElementById(`row_${entryId}`);
+            const editRow = document.getElementById(`edit_form_${entryId}`);
+            if (editRow && row) {
+                editRow.style.display = 'none';
+                row.style.display = 'table-row';
+                const inputs = editRow.querySelectorAll('input[type="text"], input[type="number"], textarea, select');
+                inputs.forEach(input => {
+                    const field = document.getElementById(input.id);
+                    if (field) field.value = field.defaultValue || '';
+                });
+                if (calendarInstance) calendarInstance.close(); // Close calendar if open
+            }
+        }
+
+        function submitAddForm(event, date) {
+            event.preventDefault();
+            const form = document.querySelector(`#form_${date} form`);
+            if (form) {
+                const formData = new FormData(form);
+                fetch(window.location.href, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json().then(data => ({ status: response.status, body: data })))
+                .then(result => {
+                    if (result.status === 200) {
+                        location.reload(); // Reload to reflect changes
+                    } else {
+                        alert(result.body.message || 'Error adding time entry.');
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+                if (calendarInstance) calendarInstance.close(); // Close calendar if open
+            } else {
+                console.error(`Form not found for date: ${date}`);
+            }
+        }
+
+        function submitEditForm(event, entryId) {
+            event.preventDefault();
+            const form = document.querySelector(`#edit_form_${entryId} form`);
+            if (form) {
+                const formData = new FormData(form);
+                fetch(window.location.href, {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(data => Promise.reject(data));
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        location.reload(); // Reload to reflect changes
+                    } else {
+                        alert(data.message || 'Error updating time entry.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert(error.message || 'An unexpected error occurred.');
+                });
+                if (calendarInstance) calendarInstance.close(); // Close calendar if open
+            } else {
+                console.error(`Edit form not found for entry: ${entryId}`);
+            }
+        }
+
+        function updateEmployee(employee) {
+            const urlParams = new URLSearchParams(window.location.search);
+            urlParams.set('employee', employee);
+            window.location.href = `${window.location.pathname}?${urlParams.toString()}`;
+            if (calendarInstance) calendarInstance.close(); // Close calendar if open
+        }
+
+        function jumpToCurrentWeek() {
+            const today = new Date();
+            const dayOfWeek = today.getDay();
+            const startDate = new Date(today.setDate(today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1))).toISOString().split('T')[0];
+            window.location.href = `${window.location.pathname}?start_date=${startDate}`;
+            if (calendarInstance) calendarInstance.close(); // Close calendar if open
+        }
+
+        function selectWeek(startDate) {
+            window.location.href = `${window.location.pathname}?start_date=${startDate}`;
+            if (calendarInstance) calendarInstance.close(); // Close calendar if open
+        }
+
+        function toggleCalendar() {
+            if (!calendarInstance) {
+                calendarInstance = flatpickr('#calendar-btn', {
+                    enableTime: false,
+                    dateFormat: 'Y-m-d',
+                    maxDate: 'today',
+                    onChange: function(selectedDates, dateStr, instance) {
+                        const startDate = new Date(selectedDates[0].setDate(selectedDates[0].getDate() - selectedDates[0].getDay() + (selectedDates[0].getDay() === 0 ? -6 : 1))).toISOString().split('T')[0];
+                        window.location.href = `${window.location.pathname}?start_date=${startDate}`;
+                    },
+                    onClose: function() {
+                        // Optional: Handle cleanup if needed
+                    }
+                });
+            }
+            calendarInstance.open();
+        }
+
+        function previousWeek() {
+            const urlParams = new URLSearchParams(window.location.search);
+            let startDate = urlParams.get('start_date');
+            if (!startDate) {
+                const today = new Date();
+                startDate = new Date(today.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1))).toISOString().split('T')[0];
+            } else {
+                startDate = new Date(startDate);
+                startDate.setDate(startDate.getDate() - 7); // Move to previous Monday
+            }
+            startDate = startDate.toISOString().split('T')[0]; // Ensure YYYY-MM-DD format
+            urlParams.set('start_date', startDate);
+            window.location.href = `${window.location.pathname}?${urlParams.toString()}`;
+            if (calendarInstance) calendarInstance.close(); // Close calendar if open
+        }
+
+        function nextWeek() {
+            const urlParams = new URLSearchParams(window.location.search);
+            let startDate = urlParams.get('start_date');
+            if (!startDate) {
+                const today = new Date();
+                startDate = new Date(today.setDate(today.getDate() - today.getDay() + (today.getDay() === 0 ? -6 : 1))).toISOString().split('T')[0];
+            } else {
+                startDate = new Date(startDate);
+                startDate.setDate(startDate.getDate() + 7); // Move to next Monday
+            }
+            startDate = startDate.toISOString().split('T')[0]; // Ensure YYYY-MM-DD format
+            urlParams.set('start_date', startDate);
+            window.location.href = `${window.location.pathname}?${urlParams.toString()}`;
+            if (calendarInstance) calendarInstance.close(); // Close calendar if open
+        }
+
+        // Initialize calendar on page load (optional, handled by toggle)
+        document.addEventListener('DOMContentLoaded', function() {
+            // No initial open, handled by toggleCalendar
+        });
+    </script>
+{% endblock %}

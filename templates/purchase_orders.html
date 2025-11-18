@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Purchase Orders</h2>
+    <a href="{{ url_for('purchase_orders.create_po') }}" class="btn btn-success btn-lg">
+      New Purchase Order
+    </a>
+  </div>
+
+  <div class="card shadow">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-striped table-hover mb-0">
+          <thead class="table-dark">
+            <tr>
+              <th>Created By</th>
+              <th>Created Date</th>
+              <th>PO Number</th>
+              <th>Vendor</th>
+              <th>Quantity</th>
+              <th>Item Description</th>
+              <th>Customer / Stock</th>
+              <th>Job #</th>
+              <th>Notes</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for po in pos.items %}
+            <tr>
+              <td>{{ po.created_by or '—' }}</td>
+              <td>{{ po.created_date.strftime('%m/%d/%Y') }}</td>
+              <td><strong>{{ po.order_number }}</strong></td>
+              <td>{{ po.vendor.name if po.vendor else '—' }}</td>
+              <td>{{ po.quantity }}</td>
+              <td>{{ po.item_description[:60] }}{% if po.item_description|length > 60 %}...{% endif %}</td>
+              <td>{{ po.customer.name if po.customer else 'Stock' }}</td>
+              <td>{{ po.job.job_number if po.job else '—' }}</td>
+              <td>{{ po.notes[:40] }}{% if po.notes and po.notes|length > 40 %}...{% endif %}</td>
+              <td>
+                <a href="{{ url_for('purchase_orders.edit_po', id=po.id) }}" class="btn btn-sm btn-warning">Edit</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pagination -->
+  {% if pos.has_prev or pos.has_next %}
+  <nav class="mt-4">
+    <ul class="pagination justify-content-center">
+      <li class="page-item {% if not pos.has_prev %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('purchase_orders.purchase_orders_page', page=pos.prev_num) }}">Previous</a>
+      </li>
+      {% for page_num in pos.iter_pages() %}
+        {% if page_num %}
+          <li class="page-item {% if page_num == pos.page %}active{% endif %}">
+            <a class="page-link" href="{{ url_for('purchase_orders.purchase_orders_page', page=page_num) }}">{{ page_num }}</a>
+          </li>
+        {% else %}
+          <li class="page-item disabled"><span class="page-link">…</span></li>
+        {% endif %}
+      {% endfor %}
+      <li class="page-item {% if not pos.has_next %}disabled{% endif %}">
+        <a class="page-link" href="{{ url_for('purchase_orders.purchase_orders_page', page=pos.next_num) }}">Next</a>
+      </li>
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+{% endblock %}

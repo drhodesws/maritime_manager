@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <div class="header">
+        <h1>Timebook Entries</h1>
+        <p>View and manage your time records here.</p>
+    </div>
+    <div style="margin-top: 20px;">
+        <form method="post" action="">
+            <label for="view">Select View:</label>
+            <select name="view" id="view" style="padding: 8px; margin-bottom: 10px;" onchange="this.form.submit()">
+                <option value="classic" {% if view == 'classic' %}selected{% endif %}>Classic</option>
+                <option value="weekly" {% if view == 'weekly' %}selected{% endif %}>Weekly</option>
+                <option value="summary" {% if view == 'summary' %}selected{% endif %}>Summary</option>
+                <option value="detailed" {% if view == 'detailed' %}selected{% endif %}>Detailed</option>
+            </select>
+        </form>
+        {% if view == 'classic' %}
+            <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                <thead>
+                    <tr>
+                        <th style="border: 1px solid #ddd; padding: 8px; background: #001f3f; color: white;">Employee</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; background: #001f3f; color: white;">Date</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; background: #001f3f; color: white;">Start</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; background: #001f3f; color: white;">Stop</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; background: #001f3f; color: white;">Hours</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; background: #001f3f; color: white;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for timebook in timebooks %}
+                        <tr>
+                            <td style="border: 1px solid #ddd; padding: 8px;">{{ timebook.employee }}</td>
+                            <td style="border: 1px solid #ddd; padding: 8px;">{{ timebook.time_date }}</td>
+                            <td style="border: 1px solid #ddd; padding: 8px;">{{ timebook.start_time }}</td>
+                            <td style="border: 1px solid #ddd; padding: 8px;">{{ timebook.stop_time }}</td>
+                            <td style="border: 1px solid #ddd; padding: 8px;">{{ "%.2f"|format(timebook.hours) }}</td>
+                            <td style="border: 1px solid #ddd; padding: 8px;">
+                                {% if not timebook.paid %}
+                                    <a href="{{ url_for('timebooks.update_timebook', id=timebook.id) }}" class="action-btn" style="padding: 5px 10px; margin-right: 5px;">Edit</a>
+                                    <form action="{{ url_for('timebooks.delete_timebook', id=timebook.id) }}" method="post" style="display: inline;">
+                                        <button type="submit" class="action-btn" style="padding: 5px 10px;" onclick="return confirm('Are you sure you want to delete this entry?');">Delete</button>
+                                    </form>
+                                {% else %}
+                                    <span style="color: gray;">Read-Only (Paid)</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% elif view == 'weekly' %}
+            <div class="week-grid">
+                {% for timebook in timebooks_week1 %}
+                    <div class="day-card">
+                        <h3>{{ timebook.time_date }}</h3>
+                        <p>Hours: {{ "%.2f"|format(timebook.hours) }}</p>
+                    </div>
+                {% endfor %}
+                {% for timebook in timebooks_week2 %}
+                    <div class="day-card">
+                        <h3>{{ timebook.time_date }}</h3>
+                        <p>Hours: {{ "%.2f"|format(timebook.hours) }}</p>
+                    </div>
+                {% endfor %}
+            </div>
+        {% elif view == 'summary' %}
+            <div class="summary">
+                <p>Total Hours: {{ "%.2f"|format(timebooks|sum(attribute='hours')) }}</p>
+            </div>
+        {% elif view == 'detailed' %}
+            <div class="entries-grid">
+                {% for timebook in timebooks %}
+                    <div class="entry-card">
+                        <p><strong>Date:</strong> {{ timebook.time_date }}</p>
+                        <p><strong>Hours:</strong> {{ "%.2f"|format(timebook.hours) }}</p>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        <p style="margin-top: 20px;">Select a view above to see different formats.</p>
+    </div>
+{% endblock %}

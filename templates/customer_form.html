@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>{{ action }} Customer</h2>
+<form method="POST">
+  {{ form.hidden_tag() }}
+  <div class="mb-3">
+    {{ form.name.label(class="form-label") }}
+    {{ form.name(class="form-control") }}
+  </div>
+  <div class="mb-3">
+    {{ form.phone.label(class="form-label") }}
+    {{ form.phone(class="form-control") }}
+  </div>
+  <div class="mb-3">
+    {{ form.address.label(class="form-label") }}
+    {{ form.address(class="form-control", rows=3) }}
+  </div>
+  <div class="mb-3">
+    {{ form.contact_info.label(class="form-label") }}
+    {{ form.contact_info(class="form-control", rows=3) }}
+  </div>
+  <button type="submit" class="btn btn-success">{{ action }} Customer</button>
+  <a href="{{ url_for('customers.customers_page') }}" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

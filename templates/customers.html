@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Customers</h2>
+<a href="{{ url_for('customers.create_customer') }}" class="btn btn-success mb-3">Add New Customer</a>
+
+<table class="table table-striped">
+  <thead class="table-dark">
+    <tr>
+      <th>Name</th>
+      <th>Phone</th>
+      <th>Address</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for customer in customers %}
+    <tr>
+      <td><strong>{{ customer.name }}</strong></td>
+      <td>{{ customer.phone or '' }}</td>
+      <td>{{ customer.address or '' }}</td>
+      <td>
+        <a href="{{ url_for('customers.edit_customer', id=customer.id) }}" class="btn btn-warning btn-sm">Edit</a>
+        <form method="POST" action="{{ url_for('customers.delete_customer', id=customer.id) }}" style="display:inline;">
+          <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Delete customer?')">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

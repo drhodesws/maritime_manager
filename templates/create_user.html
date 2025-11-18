@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid py-4">
+  <h2 class="mb-4">Create New User</h2>
+
+  <div class="card shadow">
+    <div class="card-body p-5">
+      <form method="POST">
+        <div class="row g-4">
+          <div class="col-md-6">
+            <label class="form-label fw-bold">Username</label>
+            <input type="text" name="username" class="form-control form-control-lg" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-bold">Password</label>
+            <input type="password" name="password" class="form-control form-control-lg" required>
+          </div>
+        </div>
+
+        <div class="row g-4 mt-3">
+          <div class="col-md-6">
+            <label class="form-label fw-bold">Assign Role</label>
+            <select name="role_id" class="form-select form-select-lg">
+              <option value="">— No Role (No Access) —</option>
+              {% for role in roles %}
+                <option value="{{ role.id }}">{{ role.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-bold">Link to Employee</label>
+            <select name="employee_full_name" class="form-select form-select-lg">
+              <option value="">— Not Linked —</option>
+              {% for emp in employees %}
+                <option value="{{ emp.full_name }}">{{ emp.full_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <div class="form-check">
+            <input type="checkbox" name="is_np" class="form-check-input" id="is_np">
+            <label class="form-check-label fw-bold" for="is_np">
+              Non-Paid User (no employee link needed)
+            </label>
+          </div>
+        </div>
+
+        <div class="mt-5 text-center">
+          <button type="submit" class="btn btn-success btn-lg px-5 me-3">Create User</button>
+          <a href="{{ url_for('control_panel.control_panel') }}" class="btn btn-secondary btn-lg px-4">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

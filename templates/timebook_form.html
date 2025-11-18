@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <div class="header">
+        <h1>Add New Time Entry</h1>
+        <p>Record a new timebook entry here.</p>
+    </div>
+    <div style="max-width: 600px; margin: 20px auto; padding: 20px; background: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <p style="color: {{ 'green' if category == 'success' else 'red' }};">{{ message }}</p>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        {% if form.errors %}
+            <div style="color: red; margin-bottom: 10px;">
+                {% for field, errors in form.errors.items() %}
+                    {% for error in errors %}
+                        <p>{{ field }}: {{ error }}</p>
+                    {% endfor %}
+                {% endfor %}
+            </div>
+        {% endif %}
+        <form method="post" action="" onsubmit="validateTimeInputs(event)">
+            {{ form.hidden_tag() }} <!-- Add CSRF token -->
+            {% if session.get('employee_full_name') or session['role'] == 'user' %}
+                <input type="hidden" name="employee" value="{{ session.get('employee_full_name') or session.get('username') }}">
+                <label for="employee">Employee:</label>
+                <select name="employee_display" id="employee" style="width: 100%; padding: 8px; margin-bottom: 10px;" disabled>
+                    {% for value, label in form.employee.choices %}
+                        <option value="{{ value }}" {% if value == session.get('employee_full_name') or (not session.get('employee_full_name') and value == session.get('username')) %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            {% else %}
+                <label for="employee">Employee:</label>
+                <select name="employee" id="employee" style="width: 100%; padding: 8px; margin-bottom: 10px;">
+                    {% for value, label in form.employee.choices %}
+                        <option value="{{ value }}" {% if value == form.employee.data %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            {% endif %}
+            <label for="time_date">Date:</label>
+            <input type="date" name="time_date" id="time_date" value="{{ form.time_date.data|default('', true) }}" style="width: 100%; padding: 8px; margin-bottom: 10px;" placeholder="e.g., 2025-11-15" required>
+            <label for="start_time">Start Time (24h):</label>
+            <input type="text" name="start_time" id="start_time" value="{{ form.start_time.data|default('', true) }}" style="width: 100%; padding: 8px; margin-bottom: 10px;" placeholder="e.g., 10:22" required oninput="formatTimeInput(this)">
+            <label for="stop_time">Stop Time (24h):</label>
+            <input type="text" name="stop_time" id="stop_time" value="{{ form.stop_time.data|default('', true) }}" style="width: 100%; padding: 8px; margin-bottom: 10px;" placeholder="e.g., 17:30" required oninput="formatTimeInput(this)">
+            <label for="description">Description:</label>
+            <input type="text" name="description" id="description" value="{{ form.description.data|default('', true) }}" style="width: 100%; padding: 8px; margin-bottom: 10px;" placeholder="e.g., Maintenance on MV Ocean Star">
+            <label for="job">Job:</label>
+            <input type="text" name="job" id="job" value="{{ form.job.data|default('', true) }}" style="width: 100%; padding: 8px; margin-bottom: 10px;" placeholder="e.g., Deck Work">
+            <label for="job_number">Job Number:</label>
+            <input type="text" name="job_number" id="job_number" value="{{ form.job_number.data|default('', true) }}" style="width: 100%; padding: 8px; margin-bottom: 10px;" placeholder="e.g., JOB-001">
+            <label for="mileage">Mileage:</label>
+            <input type="number" name="mileage" id="mileage" value="{{ form.mileage.data|default('', true) }}" style="width: 100%; padding: 8px; margin-bottom: 10px;" placeholder="e.g., 100" step="1">
+            <label for="location">Location:</label>
+            <input type="text" name="location" id="location" value="{{ form.location.data|default('', true) }}" style="width: 100%; padding: 8px; margin-bottom: 10px;" placeholder="e.g., Dock A">
+            <label for="pay_rate_rt">Regular Pay Rate ($/hr):</label>
+            <input type="number" name="pay_rate_rt" id="pay_rate_rt" value="{{ form.pay_rate_rt.data|default('', true) }}" style="width: 100%; padding: 8px; margin-bottom: 10px;" placeholder="e.g., 20.50" step="0.01">
+            <label for="pay_rate_ot">Overtime Pay Rate ($/hr):</label>
+            <input type="number" name="pay_rate_ot" id="pay_rate_ot" value="{{ form.pay_rate_ot.data|default('', true) }}" style="width: 100%; padding: 8px; margin-bottom: 10px;" placeholder="e.g., 30.75" step="0.01">
+            <button type="submit" class="action-btn" style="padding: 10px 20px; text-decoration: none; color: white;">Add Time</button>
+        </form>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    <script>
+        function formatTimeInput(input) {
+            let value = input.value.replace(/[^0-9:]/g, ''); // Remove non-numeric characters except colon
+            if (value.length > 5) value = value.slice(0, 5); // Limit to HH:MM
+            if (value.length >= 2 && value.charAt(2) !== ':') {
+                value = value.slice(0, 2) + ':' + value.slice(2);
+            }
+            if (value.length === 1 && parseInt(value) > 2) value = '0' + value + ':';
+            if (value.length === 2 && parseInt(value) < 24) value += ':';
+            if (value.length > 3 && parseInt(value.slice(3)) > 59) {
+                value = value.slice(0, 3) + '00';
+            }
+            input.value = value;
+        }
+
+        function validateTimeInputs(event) {
+            const startTime = document.getElementById('start_time').value;
+            const stopTime = document.getElementById('stop_time').value;
+            const timePattern = /^[0-2][0-9]:[0-5][0-9]$/;
+            if (!timePattern.test(startTime)) {
+                event.preventDefault();
+                alert('Start time must be in 24-hour format (HH:MM), e.g., 10:22');
+                return;
+            }
+            if (!timePattern.test(stopTime)) {
+                event.preventDefault();
+                alert('Stop time must be in 24-hour format (HH:MM), e.g., 17:30');
+                return;
+            }
+            const [startH, startM] = startTime.split(':').map(Number);
+            const [stopH, stopM] = stopTime.split(':').map(Number);
+            if (stopH * 60 + stopM <= startH * 60 + startM) {
+                event.preventDefault();
+                alert('Stop time must be after start time.');
+                return;
+            }
+        }
+    </script>
+{% endblock %}
